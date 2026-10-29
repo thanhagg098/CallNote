@@ -23,25 +23,9 @@ class Prefs(ctx: Context) {
         get() = sp.getLong("download_id", -1L)
         set(v) = sp.edit().putLong("download_id", v).apply()
 
-    /** Chỉ xử lý các cuộc gọi sau mốc thời gian này (tránh chạy lại hàng nghìn bản ghi cũ). */
-    var cutoffTime: Long
-        get() {
-            val v = sp.getLong("cutoff", 0L)
-            if (v == 0L) {
-                val d = System.currentTimeMillis() - 24L * 3600_000
-                sp.edit().putLong("cutoff", d).apply(); return d
-            }
-            return v
-        }
-        set(v) = sp.edit().putLong("cutoff", v).apply()
-
     var minSeconds: Int
         get() = sp.getInt("min_seconds", 20)
         set(v) = sp.edit().putInt("min_seconds", v).apply()
-
-    var onlyWhenCharging: Boolean
-        get() = sp.getBoolean("charging", false)
-        set(v) = sp.edit().putBoolean("charging", v).apply()
 
     var threads: Int
         get() = sp.getInt("threads", 4)
@@ -50,11 +34,6 @@ class Prefs(ctx: Context) {
     var folder: String
         get() = sp.getString("folder", "Recordings/Call") ?: "Recordings/Call"
         set(v) = sp.edit().putString("folder", v.trim().trim('/')).apply()
-
-    /** Thư mục Cube ACR (ghi âm Zalo) do người dùng chọn, dạng content:// */
-    var zaloTree: String
-        get() = sp.getString("zalo_tree", "") ?: ""
-        set(v) = sp.edit().putString("zalo_tree", v).apply()
 
     var vocabPrompt: String
         get() = sp.getString("prompt", DEFAULT_PROMPT) ?: DEFAULT_PROMPT
@@ -69,27 +48,9 @@ class Prefs(ctx: Context) {
         set(v) = sp.edit().putInt("daily_hour", v.coerceIn(0, 23)).apply()
 
     var exportHeader: String
-        get() = sp.getString("export_header", DEFAULT_HEADER) ?: DEFAULT_HEADER
+        get() = (sp.getString("export_header", DEFAULT_HEADER) ?: DEFAULT_HEADER)
+            .let { if (it == OLD_HEADER) DEFAULT_HEADER else it }
         set(v) = sp.edit().putString("export_header", v).apply()
-
-    /** Tự chép lời khi chạy nền. Tắt = chỉ gom bản ghi, chép lời khi người dùng bấm. */
-    var autoTranscribe: Boolean
-        get() = sp.getBoolean("auto_transcribe", false)
-        set(v) = sp.edit().putBoolean("auto_transcribe", v).apply()
-
-    /** Tự bật Cube ACR Helper khi có cuộc gọi Zalo, tắt khi cúp máy. */
-    var autoAcr: Boolean
-        get() = sp.getBoolean("auto_acr", false)
-        set(v) = sp.edit().putBoolean("auto_acr", v).apply()
-
-    /** App đã tự bật Cube (để biết mà tắt lại). */
-    var acrAutoOn: Boolean
-        get() = sp.getBoolean("acr_auto_on", false)
-        set(v) = sp.edit().putBoolean("acr_auto_on", v).apply()
-
-    var acrService: String
-        get() = sp.getString("acr_service", "") ?: ""
-        set(v) = sp.edit().putString("acr_service", v).apply()
 
     companion object {
         const val DEFAULT_MODEL_URL =
@@ -97,6 +58,11 @@ class Prefs(ctx: Context) {
         const val DEFAULT_PROMPT =
             "Cuộc gọi công việc bằng tiếng Việt. Viettel, An Giang, Phú Quốc, hạ tầng, trạm BTS, cáp quang, công văn."
         const val DEFAULT_HEADER =
+            "Dưới đây là các cuộc gọi trong ngày đã được chép lời tự động (có thể sai chính tả). " +
+                "Hãy TỔNG HỢP TÌNH HÌNH TRONG NGÀY: (1) mỗi cuộc tóm tắt 1–2 câu; " +
+                "(2) DANH SÁCH VIỆC CẦN LÀM, mỗi việc ghi rõ nội dung, người liên quan, hạn chót (nếu có), mức ưu tiên; " +
+                "(3) các việc cần gọi lại / nhắc lại. Bỏ qua cuộc gọi không có việc."
+        private const val OLD_HEADER =
             "Dưới đây là nội dung các cuộc gọi đã được chép lời tự động (có thể sai chính tả). " +
                 "Hãy lập DANH SÁCH VIỆC CẦN LÀM: mỗi việc ghi rõ nội dung, người liên quan, hạn chót (nếu có), " +
                 "mức ưu tiên. Bỏ qua cuộc gọi không có việc. Cuối cùng liệt kê các việc cần gọi lại / nhắc lại."

@@ -88,18 +88,13 @@ class Db private constructor(ctx: Context) : SQLiteOpenHelper(ctx, "callnote.db"
         writableDatabase.execSQL("UPDATE calls SET sent=1 WHERE id IN (${ids.joinToString(",")})")
     }
 
-    fun pending(): List<CallRecord> =
-        query("WHERE status=${Status.PENDING} ORDER BY call_time ASC")
+    fun pendingBetween(from: Long, to: Long): List<CallRecord> =
+        query("WHERE status=${Status.PENDING} AND call_time>=? AND call_time<? ORDER BY call_time ASC", from.toString(), to.toString())
 
     fun between(from: Long, to: Long): List<CallRecord> =
         query("WHERE call_time>=? AND call_time<? ORDER BY call_time DESC", from.toString(), to.toString())
 
     fun byId(id: Long): CallRecord? = query("WHERE id=?", id.toString()).firstOrNull()
-
-    fun countPending(): Int =
-        readableDatabase.rawQuery("SELECT COUNT(*) FROM calls WHERE status IN (0,1)", null).use {
-            it.moveToFirst(); it.getInt(0)
-        }
 
     private fun query(where: String, vararg args: String): List<CallRecord> {
         val out = ArrayList<CallRecord>()

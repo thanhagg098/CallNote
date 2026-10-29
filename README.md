@@ -6,10 +6,13 @@ File ghi âm **không bao giờ rời khỏi điện thoại**. Chỉ phần vă
 
 ## Cách hoạt động
 
-1. Samsung tự ghi âm cuộc gọi vào `Recordings/Call`.
-2. Cứ 15 phút, app quét bản ghi mới (bỏ qua cuộc ngắn hơn 20 giây), giải mã âm thanh và chép lời tiếng Việt bằng mô hình whisper trên máy.
-3. Mỗi cuộc xong có thông báo tóm tắt 3 dòng đầu.
-4. 21h hằng ngày app nhắc gửi tổng hợp. Bấm **Gửi tổng hợp** → chọn Telegram → gửi cho bot Hermes (hoặc dán vào Claude). Nội dung đã kèm sẵn lời dặn "lập danh sách việc cần làm".
+App **không chạy nền, không quét định kỳ** — chỉ làm việc khi bạn bấm.
+
+1. Samsung tự ghi âm cuộc gọi vào `Recordings/Call` như bình thường.
+2. Mở app → màn hình hiện các file ghi âm **của ngày đang chọn** (mặc định hôm nay; đổi ngày bằng mũi tên ‹ › hoặc lịch).
+3. Bấm **Chép lời N cuộc** → app chép lời tiếng Việt bằng mô hình whisper ngay trên máy (bỏ qua cuộc ngắn hơn 20 giây). Có thể thoát app, xong sẽ có thông báo.
+4. Bấm **Gửi tổng hợp** (hoặc bấm vào thông báo "Đã tổng hợp…") → chọn Telegram gửi cho bot Hermes, hoặc dán vào Claude. Bản tổng hợp gồm: tổng số cuộc/số phút, người gọi nhiều, danh sách cuộc theo giờ và lời từng cuộc, kèm lời dặn "tổng hợp tình hình trong ngày + lập danh sách việc cần làm".
+5. Tuỳ chọn: 21h mỗi tối app nhắc "Hôm nay có N cuộc" (chỉ đếm file, không chép lời).
 
 ## Build APK (GitHub tự build)
 
@@ -26,8 +29,7 @@ File ghi âm **không bao giờ rời khỏi điện thoại**. Chỉ phần vă
 1. Tải `GhiChuCuocGoi.apk`, mở file → cho phép "Cài ứng dụng không rõ nguồn".
 2. Mở app → cấp quyền **Âm thanh** và **Thông báo**.
 3. Cài đặt → **Tải mô hình** (dùng Wi‑Fi) → chờ tải xong.
-4. Cài đặt → **Cho phép chạy nền** → Cho phép.
-5. Thêm: Cài đặt máy → Pin → Giới hạn sử dụng nền → **Ứng dụng không bao giờ ngủ** → thêm "Ghi chú cuộc gọi".
+4. Không cần cho phép chạy nền nữa (bản cũ cần). Nếu trước đây đã thêm app vào "Ứng dụng không bao giờ ngủ" thì có thể gỡ ra.
 
 ## Tự bật Cube ACR khi gọi Zalo
 

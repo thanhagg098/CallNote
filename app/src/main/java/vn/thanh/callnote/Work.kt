@@ -13,7 +13,6 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
@@ -43,7 +42,7 @@ object Notif {
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
     )
 
-    fun post(ctx: Context, id: Int, title: String, text: String) {
+    fun post(ctx: Context, id: Int, title: String, text: String, intent: PendingIntent? = null) {
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) return
@@ -52,7 +51,7 @@ object Notif {
             .setContentTitle(title)
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
-            .setContentIntent(openApp(ctx))
+            .setContentIntent(intent ?: openApp(ctx))
             .setAutoCancel(true)
             .build()
         NotificationManagerCompat.from(ctx).notify(id, n)
@@ -60,19 +59,16 @@ object Notif {
 }
 
 object Scheduler {
-    private const val PERIODIC = "transcribe_periodic"
+    /** Tên việc chạy nền 15 phút của bản cũ — giữ để huỷ khi cài đè. */
+    private const val OLD_PERIODIC = "transcribe_periodic"
     private const val NOW = "transcribe_now"
     private const val DAILY = "daily_reminder"
 
-    fun schedule(ctx: Context) {
+    /** Không còn quét nền. Chỉ đặt (hoặc huỷ) lời nhắc tổng hợp hằng ngày. */
+    fun setup(ctx: Context) {
+        val wm = WorkManager.getInstance(ctx)
+        wm.cancelUniqueWork(OLD_PERIODIC)
         val p = Prefs(ctx)
-        val c = Constraints.Builder()
-            .setRequiresCharging(p.onlyWhenCharging)
-            .setRequiresBatteryNotLow(true)
-            .build()
-        val req = PeriodicWorkRequestBuilder<TranscribeWorker>(15, TimeUnit.MINUTES).setConstraints(c).build()
-        WorkManager.getInstance(ctx).enqueueUniquePeriodicWork(PERIODIC, ExistingPeriodicWorkPolicy.UPDATE, req)
-
         if (p.dailyReminder) {
             val now = Calendar.getInstance()
             val next = (now.clone() as Calendar).apply {
@@ -81,28 +77,28 @@ object Scheduler {
             }
             val daily = PeriodicWorkRequestBuilder<DailyWorker>(24, TimeUnit.HOURS)
                 .setInitialDelay(next.timeInMillis - now.timeInMillis, TimeUnit.MILLISECONDS).build()
-            WorkManager.getInstance(ctx).enqueueUniquePeriodicWork(DAILY, ExistingPeriodicWorkPolicy.UPDATE, daily)
+            wm.enqueueUniquePeriodicWork(DAILY, ExistingPeriodicWorkPolicy.UPDATE, daily)
         } else {
-            WorkManager.getInstance(ctx).cancelUniqueWork(DAILY)
+            wm.cancelUniqueWork(DAILY)
         }
     }
 
-    /** Chỉ quét bản ghi mới (nhẹ, không chép lời trừ khi bật tự động). */
-    fun runNow(ctx: Context) = enqueue(ctx, TranscribeWorker.MODE_AUTO, -1L)
+    /** Chép lời các cuộc chưa chép trong ngày [from, to), xong thì báo để gửi tổng hợp. */
+    fun transcribeDay(ctx: Context, from: Long, to: Long) =
+        enqueue(ctx, workDataOf(TranscribeWorker.KEY_MODE to TranscribeWorker.MODE_DAY,
+            TranscribeWorker.KEY_FROM to from, TranscribeWorker.KEY_TO to to))
 
-    /** Người dùng yêu cầu chép lời: tất cả cuộc đang chờ, hoặc chỉ 1 cuộc (id). */
-    fun transcribe(ctx: Context, onlyId: Long = -1L) =
-        enqueue(ctx, if (onlyId >= 0) TranscribeWorker.MODE_ONE else TranscribeWorker.MODE_ALL, onlyId)
+    /** Chép lời lại đúng 1 cuộc. */
+    fun transcribe(ctx: Context, onlyId: Long) =
+        enqueue(ctx, workDataOf(TranscribeWorker.KEY_MODE to TranscribeWorker.MODE_ONE, TranscribeWorker.KEY_ID to onlyId))
 
-    private fun enqueue(ctx: Context, mode: String, id: Long) {
-        val req = OneTimeWorkRequestBuilder<TranscribeWorker>()
-            .setInputData(workDataOf(TranscribeWorker.KEY_MODE to mode, TranscribeWorker.KEY_ID to id))
-            .build()
+    private fun enqueue(ctx: Context, data: androidx.work.Data) {
+        val req = OneTimeWorkRequestBuilder<TranscribeWorker>().setInputData(data).build()
         WorkManager.getInstance(ctx).enqueueUniqueWork(NOW, ExistingWorkPolicy.APPEND_OR_REPLACE, req)
     }
 }
 
-/** Quét bản ghi mới và chép lời offline từng cuộc. */
+/** Chép lời offline các cuộc người dùng yêu cầu (1 ngày hoặc 1 cuộc). Không tự chạy. */
 class TranscribeWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
 
     override suspend fun doWork(): Result = withContext(Dispatchers.Default) {
@@ -110,15 +106,25 @@ class TranscribeWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker
         val prefs = Prefs(ctx)
         val db = Db.get(ctx)
         db.resetStuck()
-        if (hasAudioPermission(ctx)) runCatching { Recordings.scan(ctx, prefs, db) }
-        runCatching { Recordings.scanTree(ctx, prefs, db) }
-        if (!prefs.modelReady) return@withContext Result.success()
+        if (!prefs.modelReady) {
+            Notif.post(ctx, 9, "Chưa có mô hình", "Vào Cài đặt → Tải mô hình trước khi chép lời.")
+            return@withContext Result.success()
+        }
 
-        val mode = inputData.getString(KEY_MODE) ?: MODE_AUTO
-        val onlyId = inputData.getLong(KEY_ID, -1L)
-        if (mode == MODE_AUTO && !prefs.autoTranscribe) return@withContext Result.success()
-        val todo = db.pending().let { all -> if (mode == MODE_ONE) all.filter { it.id == onlyId } else all }
-        if (todo.isEmpty()) return@withContext Result.success()
+        val mode = inputData.getString(KEY_MODE) ?: MODE_DAY
+        val from = inputData.getLong(KEY_FROM, 0L)
+        val to = inputData.getLong(KEY_TO, 0L)
+        val todo = when (mode) {
+            MODE_ONE -> listOfNotNull(db.byId(inputData.getLong(KEY_ID, -1L))?.takeIf { it.status == Status.PENDING })
+            else -> {
+                if (hasAudioPermission(ctx)) runCatching { Recordings.scanDay(ctx, prefs, db, from, to) }
+                db.pendingBetween(from, to)
+            }
+        }
+        if (todo.isEmpty()) {
+            if (mode == MODE_DAY) notifyDayDone(ctx, db, from, to)
+            return@withContext Result.success()
+        }
         runCatching { setForeground(foregroundInfo(0, todo.size)) }
 
         val model = WhisperLib.initContext(prefs.modelFile.absolutePath)
@@ -128,8 +134,8 @@ class TranscribeWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker
         }
         try {
             todo.forEachIndexed { i, rec ->
-                if (isStopped) return@withContext Result.retry()
-                runCatching { setForeground(foregroundInfo(i + 1, todo.size)) }
+                if (isStopped) return@withContext Result.success()
+                runCatching { setForeground(foregroundInfo(i, todo.size)) }
                 db.setStatus(rec.id, Status.PROCESSING)
                 try {
                     val samples = AudioDecoder.decode(ctx, Uri.parse(rec.uri))
@@ -138,11 +144,6 @@ class TranscribeWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker
                     } else {
                         val text = WhisperLib.transcribeText(model, samples, "vi", prefs.threads, prefs.vocabPrompt)
                         db.setStatus(rec.id, Status.DONE, transcript = text.ifBlank { "(không nhận ra lời nói)" }, error = "")
-                        Notif.post(
-                            ctx, (rec.id % 100000).toInt() + 100,
-                            "Đã chép lời: ${rec.contact}",
-                            text.lineSequence().take(3).joinToString(" ") { it.substringAfter("] ") }.take(300)
-                        )
                     }
                 } catch (e: Throwable) {
                     db.setStatus(rec.id, Status.ERROR, error = e.message ?: e.javaClass.simpleName)
@@ -151,14 +152,35 @@ class TranscribeWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker
         } finally {
             WhisperLib.freeContext(model)
         }
+        if (mode == MODE_DAY) notifyDayDone(ctx, db, from, to)
         Result.success()
+    }
+
+    /** Báo xong; bấm thông báo là mở ngay bảng gửi tổng hợp của ngày đó. */
+    private fun notifyDayDone(ctx: Context, db: Db, from: Long, to: Long) {
+        val calls = db.between(from, to)
+        val done = calls.count { it.status == Status.DONE }
+        if (done == 0) return
+        val err = calls.count { it.status == Status.ERROR }
+        val pi = PendingIntent.getActivity(
+            ctx, 1,
+            Intent(ctx, MainActivity::class.java)
+                .putExtra(MainActivity.EXTRA_SHARE_DAY, from)
+                .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        Notif.post(
+            ctx, 8, "Đã tổng hợp cuộc gọi ${Export.dayLabel(from)}",
+            "$done cuộc đã chép lời" + (if (err > 0) ", $err cuộc lỗi" else "") + ". Bấm để gửi cho Hermes/Claude.",
+            pi
+        )
     }
 
     private fun foregroundInfo(done: Int, total: Int): ForegroundInfo {
         val n = NotificationCompat.Builder(applicationContext, Notif.CH_WORK)
             .setSmallIcon(R.drawable.ic_notify)
             .setContentTitle("Đang chép lời cuộc gọi")
-            .setContentText("$done / $total")
+            .setContentText("${done + 1} / $total")
             .setProgress(total, done, false)
             .setOngoing(true)
             .build()
@@ -170,8 +192,9 @@ class TranscribeWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker
     companion object {
         const val KEY_MODE = "mode"
         const val KEY_ID = "id"
-        const val MODE_AUTO = "auto"
-        const val MODE_ALL = "all"
+        const val KEY_FROM = "from"
+        const val KEY_TO = "to"
+        const val MODE_DAY = "day"
         const val MODE_ONE = "one"
 
         fun hasAudioPermission(ctx: Context): Boolean {
@@ -182,17 +205,19 @@ class TranscribeWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker
     }
 }
 
-/** Nhắc gửi tổng hợp cuộc gọi trong ngày. */
+/** Mỗi tối: đếm cuộc ghi âm trong ngày (chỉ đọc danh sách file, không chép lời) và nhắc tổng hợp. */
 class DailyWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
     override suspend fun doWork(): Result {
-        val db = Db.get(applicationContext)
+        val ctx = applicationContext
+        val db = Db.get(ctx)
         val (from, to) = DayRange.today()
-        val calls = db.between(from, to).filter { it.status == Status.DONE }
+        if (TranscribeWorker.hasAudioPermission(ctx)) runCatching { Recordings.scanDay(ctx, Prefs(ctx), db, from, to) }
+        val calls = db.between(from, to).filter { it.status != Status.SKIPPED }
         if (calls.isNotEmpty()) {
-            val unsent = calls.count { !it.sent }
+            val mins = calls.sumOf { it.durationMs } / 60000
             Notif.post(
-                applicationContext, 8, "Tổng hợp cuộc gọi hôm nay",
-                "${calls.size} cuộc đã chép lời ($unsent chưa gửi). Bấm để mở và gửi cho Hermes/Claude lập danh sách việc."
+                ctx, 8, "Cuộc gọi hôm nay: ${calls.size} cuộc, $mins phút",
+                "Bấm để mở app và tổng hợp tình hình trong ngày."
             )
         }
         return Result.success()
