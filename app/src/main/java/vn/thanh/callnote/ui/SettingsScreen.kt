@@ -1,5 +1,7 @@
 package vn.thanh.callnote.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
 import android.net.Uri
 import android.os.PowerManager
@@ -48,6 +50,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import vn.thanh.callnote.AcrToggle
 import vn.thanh.callnote.ModelManager
 import vn.thanh.callnote.Prefs
 import vn.thanh.callnote.Scheduler
@@ -73,6 +76,11 @@ fun SettingsScreen(onBack: () -> Unit) {
     var hour by remember { mutableStateOf(prefs.reminderHour.toString()) }
     var importing by remember { mutableStateOf(false) }
     var zaloTree by remember { mutableStateOf(prefs.zaloTree) }
+    var autoAcr by remember { mutableStateOf(prefs.autoAcr) }
+    var listenerOn by remember { mutableStateOf(false) }
+    var canWrite by remember { mutableStateOf(false) }
+    var acrFound by remember { mutableStateOf(false) }
+    var acrOn by remember { mutableStateOf(false) }
 
     val treePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
@@ -91,6 +99,10 @@ fun SettingsScreen(onBack: () -> Unit) {
             progress = withContext(Dispatchers.IO) { ModelManager.poll(ctx, prefs) }
             if (!modelReady && prefs.modelReady) Scheduler.runNow(ctx)
             modelReady = prefs.modelReady
+            listenerOn = AcrToggle.listenerOn(ctx)
+            canWrite = AcrToggle.canWrite(ctx)
+            acrFound = AcrToggle.service(ctx) != null
+            acrOn = AcrToggle.isOn(ctx)
             delay(1500)
         }
     }
@@ -189,6 +201,47 @@ fun SettingsScreen(onBack: () -> Unit) {
             }) { Text(if (zaloTree.isBlank()) "Chọn thư mục Cube ACR" else "Chọn lại thư mục") }
 
             HorizontalDivider()
+            Section("Tự bật Cube ACR khi gọi Zalo")
+            Text(
+                "Bình thường Cube ACR Helper được tắt để app ngân hàng/chứng khoán không cảnh báo. " +
+                    "Khi có cuộc gọi Zalo, app tự bật để ghi âm; cúp máy 15 giây thì tự tắt lại.",
+                style = MaterialTheme.typography.bodySmall
+            )
+            Check("1. Quyền đọc thông báo", listenerOn)
+            if (!listenerOn) OutlinedButton(onClick = {
+                runCatching { ctx.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
+            }) { Text("Cấp quyền đọc thông báo") }
+            Check("2. Quyền đặc biệt (cấp 1 lần bằng máy tính)", canWrite)
+            if (!canWrite) {
+                Text(AcrToggle.ADB_CMD, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                OutlinedButton(onClick = {
+                    ctx.getSystemService(ClipboardManager::class.java)
+                        .setPrimaryClip(ClipData.newPlainText("adb", AcrToggle.ADB_CMD))
+                    Toast.makeText(ctx, "Đã copy lệnh", Toast.LENGTH_SHORT).show()
+                }) { Text("Copy lệnh") }
+            }
+            Check("3. Tìm thấy Cube ACR Helper", acrFound)
+            if (acrFound) Text(
+                "Cube ACR hiện đang: " + if (acrOn) "BẬT" else "TẮT",
+                color = if (acrOn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Tự bật khi có cuộc gọi Zalo", Modifier.weight(1f))
+                Switch(autoAcr, enabled = listenerOn && canWrite && acrFound, onCheckedChange = {
+                    autoAcr = it
+                    prefs.autoAcr = it
+                    if (it && AcrToggle.set(ctx, false)) {
+                        prefs.acrAutoOn = false
+                        Toast.makeText(ctx, "Đã tắt Cube ACR. Sẽ tự bật khi có cuộc gọi Zalo.", Toast.LENGTH_LONG).show()
+                    }
+                })
+            }
+            if (canWrite && acrFound) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { AcrToggle.set(ctx, true) }) { Text("Thử bật") }
+                OutlinedButton(onClick = { AcrToggle.set(ctx, false); prefs.acrAutoOn = false }) { Text("Thử tắt") }
+            }
+
+            HorizontalDivider()
             Section("Gửi tổng hợp")
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Nhắc gửi tổng hợp hằng ngày", Modifier.weight(1f))
@@ -222,6 +275,12 @@ fun SettingsScreen(onBack: () -> Unit) {
         }
     }
 }
+
+@Composable
+private fun Check(t: String, ok: Boolean) = Text(
+    (if (ok) "✓ " else "✗ ") + t,
+    color = if (ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+)
 
 @Composable
 private fun Section(t: String) = Text(t, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)

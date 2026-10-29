@@ -72,6 +72,20 @@ class Prefs(ctx: Context) {
         get() = sp.getString("export_header", DEFAULT_HEADER) ?: DEFAULT_HEADER
         set(v) = sp.edit().putString("export_header", v).apply()
 
+    /** Tự bật Cube ACR Helper khi có cuộc gọi Zalo, tắt khi cúp máy. */
+    var autoAcr: Boolean
+        get() = sp.getBoolean("auto_acr", false)
+        set(v) = sp.edit().putBoolean("auto_acr", v).apply()
+
+    /** App đã tự bật Cube (để biết mà tắt lại). */
+    var acrAutoOn: Boolean
+        get() = sp.getBoolean("acr_auto_on", false)
+        set(v) = sp.edit().putBoolean("acr_auto_on", v).apply()
+
+    var acrService: String
+        get() = sp.getString("acr_service", "") ?: ""
+        set(v) = sp.edit().putString("acr_service", v).apply()
+
     companion object {
         const val DEFAULT_MODEL_URL =
             "https://github.com/thanhagg098/CallNote/releases/download/model/ggml-phowhisper-small-q5_1.bin"

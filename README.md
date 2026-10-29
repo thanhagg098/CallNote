@@ -29,6 +29,16 @@ File ghi âm **không bao giờ rời khỏi điện thoại**. Chỉ phần vă
 4. Cài đặt → **Cho phép chạy nền** → Cho phép.
 5. Thêm: Cài đặt máy → Pin → Giới hạn sử dụng nền → **Ứng dụng không bao giờ ngủ** → thêm "Ghi chú cuộc gọi".
 
+## Tự bật Cube ACR khi gọi Zalo
+
+App ngân hàng/chứng khoán (VPS SmartOne…) cảnh báo khi Cube ACR Helper bật quyền trợ năng. App này giữ Cube **tắt** bình thường, **tự bật** khi có cuộc gọi Zalo và tự tắt 15 giây sau khi cúp máy.
+
+Thiết lập 1 lần:
+1. Cài đặt app → mục "Tự bật Cube ACR khi gọi Zalo" → **Cấp quyền đọc thông báo** → bật "Ghi chú cuộc gọi". (Nếu bị chặn "cài đặt bị hạn chế": Cài đặt máy → Ứng dụng → Ghi chú cuộc gọi → ⋮ → Cho phép cài đặt bị hạn chế.)
+2. Cấp quyền đặc biệt bằng máy tính (bật Gỡ lỗi USB, cắm cáp):
+   `adb shell pm grant vn.thanh.callnote android.permission.WRITE_SECURE_SETTINGS`
+3. Bật công tắc **Tự bật khi có cuộc gọi Zalo**.
+
 ## Ghi chú kỹ thuật
 
 - Kotlin + Jetpack Compose, minSdk 29, chỉ build arm64-v8a.

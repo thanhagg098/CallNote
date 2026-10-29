@@ -4,6 +4,8 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -116,9 +118,12 @@ fun HomeScreen(onOpen: (Long) -> Unit, onSettings: () -> Unit) {
                 Banner("Chưa có mô hình chép lời. Vào Cài đặt để tải (khoảng 190 MB, chỉ tải 1 lần).", "Mở Cài đặt", onSettings)
             }
 
-            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
                 Range.entries.forEach { r ->
-                    FilterChip(selected = r == range, onClick = { range = r }, label = { Text(r.label) })
+                    FilterChip(selected = r == range, onClick = { range = r }, label = { Text(r.label, maxLines = 1, softWrap = false) })
                 }
             }
 
