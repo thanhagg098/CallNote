@@ -83,6 +83,14 @@ class Db private constructor(ctx: Context) : SQLiteOpenHelper(ctx, "callnote.db"
         writableDatabase.execSQL("UPDATE calls SET status=${Status.PENDING} WHERE status=${Status.PROCESSING}")
     }
 
+    /** Cuộc bị lỗi lần trước: cho chép lại khi người dùng yêu cầu tổng hợp. */
+    fun retryErrors(from: Long, to: Long) {
+        writableDatabase.execSQL(
+            "UPDATE calls SET status=${Status.PENDING}, error='' WHERE status=${Status.ERROR} AND call_time>=? AND call_time<?",
+            arrayOf<Any>(from, to)
+        )
+    }
+
     fun markSent(ids: List<Long>) {
         if (ids.isEmpty()) return
         writableDatabase.execSQL("UPDATE calls SET sent=1 WHERE id IN (${ids.joinToString(",")})")

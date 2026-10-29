@@ -118,6 +118,7 @@ class TranscribeWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker
             MODE_ONE -> listOfNotNull(db.byId(inputData.getLong(KEY_ID, -1L))?.takeIf { it.status == Status.PENDING })
             else -> {
                 if (hasAudioPermission(ctx)) runCatching { Recordings.scanDay(ctx, prefs, db, from, to) }
+                db.retryErrors(from, to)
                 db.pendingBetween(from, to)
             }
         }

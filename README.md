@@ -10,8 +10,8 @@ App **không chạy nền, không quét định kỳ** — chỉ làm việc khi
 
 1. Samsung tự ghi âm cuộc gọi vào `Recordings/Call` như bình thường.
 2. Mở app → màn hình hiện các file ghi âm **của ngày đang chọn** (mặc định hôm nay; đổi ngày bằng mũi tên ‹ › hoặc lịch).
-3. Bấm **Chép lời N cuộc** → app chép lời tiếng Việt bằng mô hình whisper ngay trên máy (bỏ qua cuộc ngắn hơn 20 giây). Có thể thoát app, xong sẽ có thông báo.
-4. Bấm **Gửi tổng hợp** (hoặc bấm vào thông báo "Đã tổng hợp…") → chọn Telegram gửi cho bot Hermes, hoặc dán vào Claude. Bản tổng hợp gồm: tổng số cuộc/số phút, người gọi nhiều, danh sách cuộc theo giờ và lời từng cuộc, kèm lời dặn "tổng hợp tình hình trong ngày + lập danh sách việc cần làm".
+3. Bấm **Tổng hợp ngày** → nếu còn file chưa chép lời, app tự chép lời trên máy trước (bỏ qua cuộc ngắn hơn 20 giây; cuộc lỗi lần trước được thử lại). Có thể thoát app, xong sẽ có thông báo.
+4. Chép xong app tự mở bảng gửi (hoặc bấm vào thông báo "Đã tổng hợp…") → chọn Telegram gửi cho bot Hermes, hoặc dán vào Claude. Bản tổng hợp gồm: tổng số cuộc/số phút, người gọi nhiều, danh sách cuộc theo giờ và lời từng cuộc, kèm lời dặn "tổng hợp tình hình trong ngày + lập danh sách việc cần làm".
 5. Tuỳ chọn: 21h mỗi tối app nhắc "Hôm nay có N cuộc" (chỉ đếm file, không chép lời).
 
 ## Build APK (GitHub tự build)

@@ -99,6 +99,8 @@ fun HomeScreen(onOpen: (Long) -> Unit, onSettings: () -> Unit) {
     var tick by remember { mutableIntStateOf(0) }
     var hasPerm by remember { mutableStateOf(TranscribeWorker.hasAudioPermission(ctx)) }
     var pickDate by remember { mutableStateOf(false) }
+    // Ngày đang chờ chép lời xong để tự mở bảng gửi (-1 = không chờ)
+    var shareWhenDone by remember { mutableLongStateOf(-1L) }
 
     val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         hasPerm = TranscribeWorker.hasAudioPermission(ctx)
@@ -111,8 +113,19 @@ fun HomeScreen(onOpen: (Long) -> Unit, onSettings: () -> Unit) {
     LaunchedEffect(day, tick, hasPerm) {
         val to = dayEnd(day)
         if (hasPerm) withContext(Dispatchers.IO) { runCatching { Recordings.scanDay(ctx, prefs, db, day, to) } }
+        var sawWork = false
         while (true) {
             calls = withContext(Dispatchers.IO) { db.between(day, to) }
+            val o = Export.overview(calls)
+            if (shareWhenDone == day) {
+                if (o.pending > 0) sawWork = true
+                // Chép xong hết (đã thấy chạy, hoặc không còn gì để chép) → tự mở bảng gửi
+                if (o.pending == 0 && (sawWork || o.error == 0)) {
+                    shareWhenDone = -1L
+                    sawWork = false
+                    if (o.done > 0) shareDay(ctx, day)
+                }
+            }
             delay(2000)
         }
     }
@@ -167,13 +180,23 @@ fun HomeScreen(onOpen: (Long) -> Unit, onSettings: () -> Unit) {
                 }
             }
 
-            DaySummary(calls,
-                onTranscribe = {
-                    Scheduler.transcribeDay(ctx, day, dayEnd(day))
-                    Toast.makeText(ctx, "Bắt đầu chép lời. Có thể thoát app, xong sẽ có thông báo.", Toast.LENGTH_LONG).show()
-                },
-                onShare = { shareDay(ctx, day) },
+            DaySummary(
+                calls,
+                waitingToShare = shareWhenDone,
                 modelReady = prefs.modelReady,
+                onSummarize = {
+                    val o = Export.overview(calls)
+                    if (o.pending + o.error == 0) {
+                        shareDay(ctx, day)
+                    } else {
+                        // Còn file chưa chép lời → ra lệnh chép lời trước, xong tự mở bảng gửi.
+                        Scheduler.transcribeDay(ctx, day, dayEnd(day))
+                        shareWhenDone = day
+                        Toast.makeText(
+                            ctx, "Đang chép lời ${o.pending + o.error} cuộc chưa có lời. Xong sẽ tự mở bảng gửi.", Toast.LENGTH_LONG
+                        ).show()
+                    }
+                },
             )
 
             if (calls.isEmpty()) {
@@ -190,10 +213,11 @@ fun HomeScreen(onOpen: (Long) -> Unit, onSettings: () -> Unit) {
 }
 
 @Composable
-private fun DaySummary(calls: List<CallRecord>, onTranscribe: () -> Unit, onShare: () -> Unit, modelReady: Boolean) {
+private fun DaySummary(calls: List<CallRecord>, waitingToShare: Long, modelReady: Boolean, onSummarize: () -> Unit) {
     if (calls.isEmpty()) return
     val o = Export.overview(calls)
-    val processing = calls.any { it.status == Status.PROCESSING }
+    val busy = calls.any { it.status == Status.PROCESSING } || (waitingToShare >= 0 && o.pending > 0)
+    val missing = o.pending + o.error
     Card(
         Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
@@ -204,21 +228,25 @@ private fun DaySummary(calls: List<CallRecord>, onTranscribe: () -> Unit, onShar
                 "Gọi nhiều: " + o.topContacts.joinToString(", ") { "${it.first} (${it.second})" },
                 style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis
             )
-            if (processing) {
+            if (busy) {
                 val frac = if (o.total > 0) o.done.toFloat() / o.total else 0f
                 LinearProgressIndicator(progress = { frac }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
-                Text("Đang chép lời… (có thể thoát app)", style = MaterialTheme.typography.bodySmall)
-            }
-            Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (o.pending > 0 && !processing) {
-                    Button(enabled = modelReady, onClick = onTranscribe) { Text("Chép lời ${o.pending} cuộc") }
-                    Spacer(Modifier.width(8.dp))
+                Text(
+                    "Đang chép lời các cuộc còn thiếu… Xong sẽ tự mở bảng gửi (thoát app thì bấm vào thông báo).",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            } else {
+                Button(
+                    enabled = if (missing > 0) modelReady else o.done > 0,
+                    onClick = onSummarize,
+                    modifier = Modifier.padding(top = 8.dp).fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Send, null); Spacer(Modifier.width(6.dp))
+                    Text(if (missing > 0) "Tổng hợp ngày (chép lời thêm $missing cuộc)" else "Tổng hợp ngày & gửi")
                 }
-                val shareBtn: @Composable () -> Unit = {
-                    Icon(Icons.Default.Send, null); Spacer(Modifier.width(6.dp)); Text("Gửi tổng hợp")
-                }
-                if (o.pending == 0) Button(enabled = o.done > 0, onClick = onShare, content = { shareBtn() })
-                else OutlinedButton(enabled = o.done > 0, onClick = onShare, content = { shareBtn() })
+                if (missing > 0 && !modelReady)
+                    Text("Cần tải mô hình trong Cài đặt trước.", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error)
             }
         }
     }
