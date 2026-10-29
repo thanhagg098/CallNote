@@ -134,15 +134,22 @@ fun HomeScreen(onOpen: (Long) -> Unit, onSettings: () -> Unit) {
                 verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
             ) {
                 Text(
-                    "${calls.size} cuộc · ${done.size} đã chép lời" + if (waiting > 0) " · $waiting đang chờ" else "",
+                    "${calls.size} cuộc · ${done.size} đã chép lời" + if (waiting > 0) " · $waiting chưa chép" else "",
                     style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f)
                 )
+                if (waiting > 0) {
+                    OutlinedButton(onClick = {
+                        Scheduler.transcribe(ctx)
+                        Toast.makeText(ctx, "Bắt đầu chép lời $waiting cuộc…", Toast.LENGTH_SHORT).show()
+                    }) { Text("Chép lời") }
+                    Spacer(Modifier.width(6.dp))
+                }
                 Button(enabled = done.isNotEmpty(), onClick = {
                     val text = Export.build(prefs, done, range.label.lowercase())
                     Export.share(ctx, text)
                     db.markSent(done.map { it.id })
                 }) {
-                    Icon(Icons.Default.Send, null); Spacer(Modifier.width(6.dp)); Text("Gửi tổng hợp")
+                    Icon(Icons.Default.Send, null); Spacer(Modifier.width(6.dp)); Text("Gửi")
                 }
             }
 
@@ -175,7 +182,7 @@ private fun Banner(text: String, action: String, onClick: () -> Unit) {
 private val timeFmt = SimpleDateFormat("dd/MM HH:mm", Locale("vi"))
 
 fun statusLabel(s: Int) = when (s) {
-    Status.PENDING -> "Chờ xử lý"
+    Status.PENDING -> "Chưa chép lời"
     Status.PROCESSING -> "Đang chép lời…"
     Status.DONE -> "Đã chép lời"
     Status.ERROR -> "Lỗi"

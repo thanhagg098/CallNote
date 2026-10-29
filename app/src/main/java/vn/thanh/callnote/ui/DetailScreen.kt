@@ -96,8 +96,8 @@ fun DetailScreen(id: Long, onBack: () -> Unit) {
             if (c.status != Status.PROCESSING) {
                 OutlinedButton(onClick = {
                     db.setStatus(c.id, Status.PENDING, error = "")
-                    Scheduler.runNow(ctx)
-                    Toast.makeText(ctx, "Đã đưa vào hàng chờ chép lời", Toast.LENGTH_SHORT).show()
+                    Scheduler.transcribe(ctx, c.id)
+                    Toast.makeText(ctx, "Đang chép lời cuộc này…", Toast.LENGTH_SHORT).show()
                 }) { Icon(Icons.Default.Replay, null); Text(if (c.status == Status.DONE) "Chép lời lại" else "Chép lời") }
             }
             SelectionContainer {

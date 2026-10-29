@@ -72,6 +72,11 @@ class Prefs(ctx: Context) {
         get() = sp.getString("export_header", DEFAULT_HEADER) ?: DEFAULT_HEADER
         set(v) = sp.edit().putString("export_header", v).apply()
 
+    /** Tự chép lời khi chạy nền. Tắt = chỉ gom bản ghi, chép lời khi người dùng bấm. */
+    var autoTranscribe: Boolean
+        get() = sp.getBoolean("auto_transcribe", false)
+        set(v) = sp.edit().putBoolean("auto_transcribe", v).apply()
+
     /** Tự bật Cube ACR Helper khi có cuộc gọi Zalo, tắt khi cúp máy. */
     var autoAcr: Boolean
         get() = sp.getBoolean("auto_acr", false)

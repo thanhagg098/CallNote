@@ -72,6 +72,7 @@ fun SettingsScreen(onBack: () -> Unit) {
     var prompt by remember { mutableStateOf(prefs.vocabPrompt) }
     var header by remember { mutableStateOf(prefs.exportHeader) }
     var charging by remember { mutableStateOf(prefs.onlyWhenCharging) }
+    var autoTr by remember { mutableStateOf(prefs.autoTranscribe) }
     var daily by remember { mutableStateOf(prefs.dailyReminder) }
     var hour by remember { mutableStateOf(prefs.reminderHour.toString()) }
     var importing by remember { mutableStateOf(false) }
@@ -125,6 +126,7 @@ fun SettingsScreen(onBack: () -> Unit) {
         prefs.vocabPrompt = prompt
         prefs.exportHeader = header
         prefs.onlyWhenCharging = charging
+        prefs.autoTranscribe = autoTr
         prefs.dailyReminder = daily
         Scheduler.schedule(ctx)
     }
@@ -169,7 +171,18 @@ fun SettingsScreen(onBack: () -> Unit) {
             Section("Xử lý cuộc gọi")
             NumberField(minSec, { minSec = it }, "Bỏ qua cuộc gọi ngắn hơn (giây)")
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Chỉ chạy khi đang sạc", Modifier.weight(1f))
+                Column(Modifier.weight(1f)) {
+                    Text("Tự động chép lời")
+                    Text(
+                        if (autoTr) "Chép lời ngay khi có cuộc mới (tốn pin, nóng máy)"
+                        else "Chỉ gom bản ghi. Chép lời khi bấm nút \"Chép lời\"",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                Switch(autoTr, { autoTr = it })
+            }
+            if (autoTr) Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Chỉ tự chép khi đang sạc", Modifier.weight(1f))
                 Switch(charging, { charging = it })
             }
             NumberField(threads, { threads = it }, "Số luồng CPU (4 là hợp lý)")

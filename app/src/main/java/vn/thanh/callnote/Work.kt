@@ -22,6 +22,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import androidx.work.workDataOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Calendar
@@ -86,9 +87,18 @@ object Scheduler {
         }
     }
 
-    fun runNow(ctx: Context) {
-        val req = OneTimeWorkRequestBuilder<TranscribeWorker>().build()
-        WorkManager.getInstance(ctx).enqueueUniqueWork(NOW, ExistingWorkPolicy.KEEP, req)
+    /** Chỉ quét bản ghi mới (nhẹ, không chép lời trừ khi bật tự động). */
+    fun runNow(ctx: Context) = enqueue(ctx, TranscribeWorker.MODE_AUTO, -1L)
+
+    /** Người dùng yêu cầu chép lời: tất cả cuộc đang chờ, hoặc chỉ 1 cuộc (id). */
+    fun transcribe(ctx: Context, onlyId: Long = -1L) =
+        enqueue(ctx, if (onlyId >= 0) TranscribeWorker.MODE_ONE else TranscribeWorker.MODE_ALL, onlyId)
+
+    private fun enqueue(ctx: Context, mode: String, id: Long) {
+        val req = OneTimeWorkRequestBuilder<TranscribeWorker>()
+            .setInputData(workDataOf(TranscribeWorker.KEY_MODE to mode, TranscribeWorker.KEY_ID to id))
+            .build()
+        WorkManager.getInstance(ctx).enqueueUniqueWork(NOW, ExistingWorkPolicy.APPEND_OR_REPLACE, req)
     }
 }
 
@@ -104,7 +114,10 @@ class TranscribeWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker
         runCatching { Recordings.scanTree(ctx, prefs, db) }
         if (!prefs.modelReady) return@withContext Result.success()
 
-        val todo = db.pending()
+        val mode = inputData.getString(KEY_MODE) ?: MODE_AUTO
+        val onlyId = inputData.getLong(KEY_ID, -1L)
+        if (mode == MODE_AUTO && !prefs.autoTranscribe) return@withContext Result.success()
+        val todo = db.pending().let { all -> if (mode == MODE_ONE) all.filter { it.id == onlyId } else all }
         if (todo.isEmpty()) return@withContext Result.success()
         runCatching { setForeground(foregroundInfo(0, todo.size)) }
 
@@ -155,6 +168,12 @@ class TranscribeWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker
     }
 
     companion object {
+        const val KEY_MODE = "mode"
+        const val KEY_ID = "id"
+        const val MODE_AUTO = "auto"
+        const val MODE_ALL = "all"
+        const val MODE_ONE = "one"
+
         fun hasAudioPermission(ctx: Context): Boolean {
             val perm = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_AUDIO
             else Manifest.permission.READ_EXTERNAL_STORAGE
