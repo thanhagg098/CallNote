@@ -1,0 +1,64 @@
+name: Tạo mô hình PhoWhisper
+
+# Chuyển mô hình PhoWhisper (VinAI, chuyên tiếng Việt) sang định dạng whisper.cpp
+# rồi đăng lên Releases để app tải về. Chạy thủ công 1 lần trong tab Actions.
+on:
+  workflow_dispatch:
+    inputs:
+      size:
+        description: "Kích thước (small: nhanh, ~190MB | medium: chính xác hơn, chậm hơn, ~540MB)"
+        required: true
+        default: small
+        type: choice
+        options: [small, medium]
+
+permissions:
+  contents: write
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cài thư viện
+        run: |
+          pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu
+          pip install --quiet "transformers<4.46" huggingface_hub numpy
+
+      - name: Tải mã nguồn
+        run: |
+          git clone --depth 1 https://github.com/openai/whisper.git
+          git clone --depth 1 --branch v1.7.6 https://github.com/ggml-org/whisper.cpp.git
+
+      - name: Tải PhoWhisper
+        run: |
+          python -c "from huggingface_hub import snapshot_download; snapshot_download('vinai/PhoWhisper-${{ inputs.size }}', local_dir='pho')"
+          ls -la pho
+
+      - name: Chuyển sang ggml
+        run: |
+          mkdir out
+          [ -f pho/added_tokens.json ] || echo '{}' > pho/added_tokens.json
+          python whisper.cpp/models/convert-h5-to-ggml.py ./pho ./whisper ./out
+          ls -la out
+
+      - name: Nén (lượng tử hoá q5)
+        run: |
+          cmake -S whisper.cpp -B wbuild -DCMAKE_BUILD_TYPE=Release -DWHISPER_BUILD_TESTS=OFF
+          cmake --build wbuild -j --target quantize
+          Q=$(find wbuild/bin -type f \( -name "whisper-quantize" -o -name "quantize" \) | head -1)
+          echo "Dùng: $Q"
+          $Q out/ggml-model.bin ggml-phowhisper-${{ inputs.size }}-q5_1.bin q5_1
+          ls -la *.bin
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: model
+          name: Mô hình PhoWhisper
+          prerelease: false
+          make_latest: false
+          body: "Copy link file .bin bên dưới, dán vào app: Cài đặt → Link tải mô hình → Tải mô hình."
+          files: ggml-phowhisper-${{ inputs.size }}-q5_1.bin
