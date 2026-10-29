@@ -143,7 +143,7 @@ class TranscribeWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker
                     if (samples.size < 16000 * 2) {
                         db.setStatus(rec.id, Status.SKIPPED, error = "Âm thanh quá ngắn")
                     } else {
-                        val text = WhisperLib.transcribeText(model, samples, "vi", prefs.threads, prefs.vocabPrompt)
+                        val text = WhisperLib.transcribeText(model, samples, "vi", prefs.threads, prefs.vocabPrompt, if (prefs.highQuality) 5 else 1)
                         db.setStatus(rec.id, Status.DONE, transcript = text.ifBlank { "(không nhận ra lời nói)" }, error = "")
                     }
                 } catch (e: Throwable) {

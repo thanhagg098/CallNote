@@ -98,21 +98,56 @@ object AudioDecoder {
         } finally {
             codec.stop(); codec.release(); extractor.release()
         }
-        return resample(buf.toArray(), sampleRate, TARGET_RATE)
+        return normalize(resample(buf.toArray(), sampleRate, TARGET_RATE))
     }
 
+    /** Bỏ lệch DC và đưa âm lượng về mức chuẩn (ghi âm cuộc gọi thường nhỏ, không đều). */
+    private fun normalize(x: FloatArray): FloatArray {
+        if (x.isEmpty()) return x
+        var mean = 0.0
+        for (v in x) mean += v
+        mean /= x.size
+        var sq = 0.0
+        var peak = 0f
+        for (i in x.indices) {
+            val v = (x[i] - mean).toFloat(); x[i] = v
+            sq += v * v; if (kotlin.math.abs(v) > peak) peak = kotlin.math.abs(v)
+        }
+        val rms = kotlin.math.sqrt(sq / x.size).toFloat()
+        if (rms < 1e-5f) return x
+        val gain = minOf(0.1f / rms, 0.95f / peak, 20f)
+        for (i in x.indices) x[i] *= gain
+        return x
+    }
+
+    /** Đổi tần số mẫu bằng bộ lọc sinc có cửa sổ (chống méo/rè khi hạ tần số). */
     private fun resample(input: FloatArray, from: Int, to: Int): FloatArray {
         if (from == to || input.isEmpty()) return input
         val ratio = from.toDouble() / to
         val outLen = (input.size / ratio).toInt()
         val out = FloatArray(outLen)
+        val cutoff = if (to < from) 0.92 * to / from else 0.92  // tỉ lệ so với Nyquist đầu vào
+        val half = 16
+        val scale = if (to < from) ratio else 1.0
+        val width = (half * scale).toInt().coerceAtLeast(half)
         for (i in 0 until outLen) {
-            val pos = i * ratio
-            val idx = pos.toInt()
-            val frac = (pos - idx).toFloat()
-            val a = input[idx]
-            val b = if (idx + 1 < input.size) input[idx + 1] else a
-            out[i] = a + (b - a) * frac
+            val center = i * ratio
+            val c0 = center.toInt()
+            var acc = 0.0
+            var norm = 0.0
+            for (k in c0 - width + 1..c0 + width) {
+                if (k < 0 || k >= input.size) continue
+                val t = k - center
+                val xw = t / width
+                if (xw <= -1.0 || xw >= 1.0) continue
+                val arg = Math.PI * cutoff * t
+                val sinc = if (kotlin.math.abs(arg) < 1e-9) 1.0 else kotlin.math.sin(arg) / arg
+                val win = 0.5 * (1 + kotlin.math.cos(Math.PI * xw))   // cửa sổ Hann
+                val w = sinc * win
+                acc += input[k] * w
+                norm += w
+            }
+            out[i] = if (norm != 0.0) (acc / norm).toFloat() else 0f
         }
         return out
     }

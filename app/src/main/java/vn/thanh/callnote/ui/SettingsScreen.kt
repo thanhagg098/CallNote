@@ -71,6 +71,7 @@ fun SettingsScreen(onBack: () -> Unit) {
     var daily by remember { mutableStateOf(prefs.dailyReminder) }
     var hour by remember { mutableStateOf(prefs.reminderHour.toString()) }
     var importing by remember { mutableStateOf(false) }
+    var hq by remember { mutableStateOf(prefs.highQuality) }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -98,6 +99,7 @@ fun SettingsScreen(onBack: () -> Unit) {
         prefs.vocabPrompt = prompt
         prefs.exportHeader = header
         prefs.dailyReminder = daily
+        prefs.highQuality = hq
         Scheduler.setup(ctx)
     }
 
@@ -116,6 +118,14 @@ fun SettingsScreen(onBack: () -> Unit) {
                 if (modelReady) "Đã có: ${prefs.modelName.ifBlank { "model.bin" }} (${prefs.modelFile.length() / 1_000_000} MB)"
                 else "Chưa có mô hình.",
                 color = if (modelReady) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { url = Prefs.SMALL_MODEL_URL }) { Text("Small 190 MB") }
+                OutlinedButton(onClick = { url = Prefs.MEDIUM_MODEL_URL }) { Text("Medium 590 MB") }
+            }
+            Text(
+                "Medium chép tiếng Việt đúng hơn rõ rệt nhưng chậm hơn ~3 lần. Chọn rồi bấm Tải mô hình.",
+                style = MaterialTheme.typography.bodySmall
             )
             OutlinedTextField(url, { url = it }, label = { Text("Link tải mô hình") }, modifier = Modifier.fillMaxWidth())
             val p = progress
@@ -140,6 +150,16 @@ fun SettingsScreen(onBack: () -> Unit) {
             HorizontalDivider()
             Section("Chép lời")
             NumberField(minSec, { minSec = it }, "Bỏ qua cuộc gọi ngắn hơn (giây)")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Chép lời kỹ")
+                    Text(
+                        if (hq) "Chính xác hơn, ít bị lặp chữ; chậm hơn ~2–3 lần" else "Nhanh nhưng dễ sai, dễ lặp chữ",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                Switch(hq, { hq = it })
+            }
             NumberField(threads, { threads = it }, "Số luồng CPU (4 là hợp lý)")
             OutlinedTextField(folder, { folder = it }, label = { Text("Thư mục ghi âm") }, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(

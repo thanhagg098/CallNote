@@ -31,6 +31,11 @@ class Prefs(ctx: Context) {
         get() = sp.getInt("threads", 4)
         set(v) = sp.edit().putInt("threads", v.coerceIn(1, 8)).apply()
 
+    /** Chép lời kỹ (beam search): chính xác hơn, chậm hơn. */
+    var highQuality: Boolean
+        get() = sp.getBoolean("high_quality", true)
+        set(v) = sp.edit().putBoolean("high_quality", v).apply()
+
     var folder: String
         get() = sp.getString("folder", "Recordings/Call") ?: "Recordings/Call"
         set(v) = sp.edit().putString("folder", v.trim().trim('/')).apply()
@@ -55,6 +60,9 @@ class Prefs(ctx: Context) {
     companion object {
         const val DEFAULT_MODEL_URL =
             "https://github.com/thanhagg098/CallNote/releases/download/model/ggml-phowhisper-small-q5_1.bin"
+        const val SMALL_MODEL_URL = DEFAULT_MODEL_URL
+        const val MEDIUM_MODEL_URL =
+            "https://github.com/thanhagg098/CallNote/releases/download/model/ggml-phowhisper-medium-q5_1.bin"
         const val DEFAULT_PROMPT =
             "Cuộc gọi công việc bằng tiếng Việt. Viettel, An Giang, Phú Quốc, hạ tầng, trạm BTS, cáp quang, công văn."
         const val DEFAULT_HEADER =

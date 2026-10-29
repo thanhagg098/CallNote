@@ -36,7 +36,7 @@ Java_vn_thanh_callnote_WhisperLib_freeContext(JNIEnv *, jobject, jlong ptr) {
 
 JNIEXPORT jbyteArray JNICALL
 Java_vn_thanh_callnote_WhisperLib_transcribe(JNIEnv *env, jobject, jlong ptr, jfloatArray jsamples,
-                                             jstring jlang, jint threads, jstring jprompt) {
+                                             jstring jlang, jint threads, jstring jprompt, jint beam) {
     auto *ctx = reinterpret_cast<whisper_context *>(ptr);
     if (ctx == nullptr) return env->NewByteArray(0);
 
@@ -45,7 +45,15 @@ Java_vn_thanh_callnote_WhisperLib_transcribe(JNIEnv *env, jobject, jlong ptr, jf
     const char *lang = env->GetStringUTFChars(jlang, nullptr);
     const char *prompt = env->GetStringUTFChars(jprompt, nullptr);
 
-    whisper_full_params p = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
+    // beam > 1: dò nhiều hướng cùng lúc → chính xác hơn, ít lặp hơn (chậm hơn ~2-3 lần)
+    whisper_full_params p = whisper_full_default_params(beam > 1 ? WHISPER_SAMPLING_BEAM_SEARCH : WHISPER_SAMPLING_GREEDY);
+    if (beam > 1) p.beam_search.beam_size = beam;
+    p.greedy.best_of = 5;
+    p.temperature_inc = 0.2f;   // đoạn nào "kẹt" lặp thì thử lại với độ ngẫu nhiên cao hơn
+    p.entropy_thold = 2.4f;
+    p.logprob_thold = -1.0f;
+    p.no_speech_thold = 0.6f;
+    p.suppress_nst = true;      // bỏ các ký hiệu không phải lời nói
     p.print_realtime = false;
     p.print_progress = false;
     p.print_timestamps = false;

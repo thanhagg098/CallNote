@@ -9,9 +9,9 @@ object WhisperLib {
     external fun initContext(modelPath: String): Long
     external fun freeContext(ptr: Long)
     private external fun transcribe(
-        ptr: Long, samples: FloatArray, lang: String, threads: Int, prompt: String
+        ptr: Long, samples: FloatArray, lang: String, threads: Int, prompt: String, beam: Int
     ): ByteArray
 
-    fun transcribeText(ptr: Long, samples: FloatArray, lang: String, threads: Int, prompt: String): String =
-        String(transcribe(ptr, samples, lang, threads, prompt), Charsets.UTF_8).trim()
+    fun transcribeText(ptr: Long, samples: FloatArray, lang: String, threads: Int, prompt: String, beam: Int): String =
+        TextClean.removeLoops(String(transcribe(ptr, samples, lang, threads, prompt, beam), Charsets.UTF_8).trim())
 }
