@@ -50,6 +50,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import vn.thanh.callnote.AcrLog
 import vn.thanh.callnote.AcrToggle
 import vn.thanh.callnote.ModelManager
 import vn.thanh.callnote.Prefs
@@ -82,6 +83,7 @@ fun SettingsScreen(onBack: () -> Unit) {
     var canWrite by remember { mutableStateOf(false) }
     var acrFound by remember { mutableStateOf(false) }
     var acrOn by remember { mutableStateOf(false) }
+    var acrLog by remember { mutableStateOf("") }
 
     val treePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
@@ -104,6 +106,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             canWrite = AcrToggle.canWrite(ctx)
             acrFound = AcrToggle.service(ctx) != null
             acrOn = AcrToggle.isOn(ctx)
+            acrLog = AcrLog.read(ctx)
             delay(1500)
         }
     }
@@ -252,6 +255,24 @@ fun SettingsScreen(onBack: () -> Unit) {
             if (canWrite && acrFound) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { AcrToggle.set(ctx, true) }) { Text("Thử bật") }
                 OutlinedButton(onClick = { AcrToggle.set(ctx, false); prefs.acrAutoOn = false }) { Text("Thử tắt") }
+            }
+
+            Section("Nhật ký Cube ACR")
+            Text(
+                "Gọi thử 1 cuộc Zalo rồi quay lại đây xem. Dòng mới nhất ở trên cùng.",
+                style = MaterialTheme.typography.bodySmall
+            )
+            Text(
+                acrLog.ifBlank { "(Chưa có gì. Nếu đã gọi Zalo mà trống → app chưa nhận được thông báo của Zalo.)" },
+                style = MaterialTheme.typography.bodySmall
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = {
+                    ctx.getSystemService(ClipboardManager::class.java)
+                        .setPrimaryClip(ClipData.newPlainText("acr log", acrLog))
+                    Toast.makeText(ctx, "Đã copy nhật ký", Toast.LENGTH_SHORT).show()
+                }) { Text("Copy nhật ký") }
+                OutlinedButton(onClick = { AcrLog.clear(ctx); acrLog = "" }) { Text("Xoá nhật ký") }
             }
 
             HorizontalDivider()
