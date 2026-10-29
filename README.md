@@ -17,7 +17,8 @@ File ghi âm **không bao giờ rời khỏi điện thoại**. Chỉ phần vă
 
 ## Mô hình chép lời
 
-- Mặc định: `ggml-small-q5_1.bin` (whisper đa ngôn ngữ, ~190 MB).
+- Mặc định: PhoWhisper-small (VinAI, chuyên tiếng Việt, ~190 MB), lấy từ Releases → `model`.
+- Dự phòng: `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin` (whisper đa ngôn ngữ).
 - Tốt hơn cho tiếng Việt: chạy workflow **"Tạo mô hình PhoWhisper"** trong tab Actions (chọn `small`), xong thì copy link file `.bin` ở Releases → `model`, dán vào app: Cài đặt → Link tải mô hình → Tải mô hình.
 
 ## Cài đặt trên điện thoại (S24 Ultra)

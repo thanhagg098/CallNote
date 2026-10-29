@@ -69,7 +69,7 @@ class Prefs(ctx: Context) {
 
     companion object {
         const val DEFAULT_MODEL_URL =
-            "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin"
+            "https://github.com/thanhagg098/CallNote/releases/download/model/ggml-phowhisper-small-q5_1.bin"
         const val DEFAULT_PROMPT =
             "Cuộc gọi công việc bằng tiếng Việt. Viettel, An Giang, Phú Quốc, hạ tầng, trạm BTS, cáp quang, công văn."
         const val DEFAULT_HEADER =
