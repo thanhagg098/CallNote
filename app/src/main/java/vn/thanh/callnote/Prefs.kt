@@ -51,6 +51,11 @@ class Prefs(ctx: Context) {
         get() = sp.getString("folder", "Recordings/Call") ?: "Recordings/Call"
         set(v) = sp.edit().putString("folder", v.trim().trim('/')).apply()
 
+    /** Thư mục Cube ACR (ghi âm Zalo) do người dùng chọn, dạng content:// */
+    var zaloTree: String
+        get() = sp.getString("zalo_tree", "") ?: ""
+        set(v) = sp.edit().putString("zalo_tree", v).apply()
+
     var vocabPrompt: String
         get() = sp.getString("prompt", DEFAULT_PROMPT) ?: DEFAULT_PROMPT
         set(v) = sp.edit().putString("prompt", v).apply()

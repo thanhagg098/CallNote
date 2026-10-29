@@ -72,6 +72,19 @@ fun SettingsScreen(onBack: () -> Unit) {
     var daily by remember { mutableStateOf(prefs.dailyReminder) }
     var hour by remember { mutableStateOf(prefs.reminderHour.toString()) }
     var importing by remember { mutableStateOf(false) }
+    var zaloTree by remember { mutableStateOf(prefs.zaloTree) }
+
+    val treePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) {
+            runCatching {
+                ctx.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            prefs.zaloTree = uri.toString()
+            zaloTree = uri.toString()
+            Scheduler.runNow(ctx)
+            Toast.makeText(ctx, "Đã chọn thư mục ghi âm Zalo", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -162,6 +175,18 @@ fun SettingsScreen(onBack: () -> Unit) {
                     Toast.makeText(ctx, "Sẽ xử lý cuộc gọi trong $d ngày gần nhất", Toast.LENGTH_LONG).show()
                 }) { Text("Xử lý lại từ N ngày trước") }
             }
+
+            HorizontalDivider()
+            Section("Cuộc gọi Zalo (Cube ACR)")
+            Text(
+                if (zaloTree.isBlank()) "Chưa chọn. Bấm nút dưới, vào Documents → CubeCallRecorder → \"Sử dụng thư mục này\" → Cho phép."
+                else "Đang quét: " + Uri.decode(zaloTree).substringAfterLast(':'),
+                style = MaterialTheme.typography.bodySmall
+            )
+            OutlinedButton(onClick = {
+                val initial = Uri.parse("content://com.android.externalstorage.documents/document/primary%3ADocuments%2FCubeCallRecorder")
+                treePicker.launch(initial)
+            }) { Text(if (zaloTree.isBlank()) "Chọn thư mục Cube ACR" else "Chọn lại thư mục") }
 
             HorizontalDivider()
             Section("Gửi tổng hợp")

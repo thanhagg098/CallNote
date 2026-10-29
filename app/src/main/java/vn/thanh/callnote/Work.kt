@@ -100,8 +100,8 @@ class TranscribeWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker
         val prefs = Prefs(ctx)
         val db = Db.get(ctx)
         db.resetStuck()
-        if (!hasAudioPermission(ctx)) return@withContext Result.success()
-        runCatching { Recordings.scan(ctx, prefs, db) }
+        if (hasAudioPermission(ctx)) runCatching { Recordings.scan(ctx, prefs, db) }
+        runCatching { Recordings.scanTree(ctx, prefs, db) }
         if (!prefs.modelReady) return@withContext Result.success()
 
         val todo = db.pending()
