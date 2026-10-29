@@ -56,6 +56,8 @@ object Recordings {
                 if (f.isDirectory) { if (depth < 3) walk(f, depth + 1); continue }
                 val name = f.name ?: continue
                 if (name.substringAfterLast('.', "").lowercase() !in AUDIO_EXT) continue
+                // Chỉ lấy cuộc gọi Zalo; cuộc gọi thường đã có bản ghi âm của Samsung
+                if (!name.lowercase().contains("zalo")) continue
                 val time = f.lastModified()
                 if (time < prefs.cutoffTime) continue
                 val uri = f.uri.toString()
